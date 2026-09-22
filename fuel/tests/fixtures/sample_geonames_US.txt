@@ -1,0 +1,4 @@
+4885340	Chicago	Chicago	Chicago	41.85003	-87.65005	P	PPL	US		IL
+4407066	Big Cabin	Big Cabin	Big Cabin	36.53994	-95.21419	P	PPL	US		OK
+5106834	New York City	New York City	NYC	40.71427	-74.00597	P	PPLA	US		NY
+4046255	Cape Canaveral Air Force Station	Cape Canaveral AFS	CCAFS	28.48551	-80.5678	S	MIL	US		FL

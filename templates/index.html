@@ -1,0 +1,382 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fuel Route Optimizer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    :root {
+      --bg: #12151b;
+      --surface: #1a1e26;
+      --surface-2: #20242e;
+      --line: #2c3140;
+      --ink: #eef1f6;
+      --ink-dim: #8b93a3;
+      --amber: #ffb703;
+      --amber-dim: rgba(255, 183, 3, 0.14);
+      --danger: #ff6b6b;
+      --danger-bg: rgba(255, 107, 107, 0.08);
+      --radius: 7px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: "Inter", system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .page {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 2.5rem 1.5rem 4rem;
+    }
+
+    header.masthead {
+      margin-bottom: 2rem;
+    }
+
+    h1 {
+      font-family: "Barlow Condensed", sans-serif;
+      font-weight: 600;
+      font-size: clamp(2rem, 4.5vw, 2.75rem);
+      letter-spacing: -0.01em;
+      margin: 0 0 0.35rem;
+    }
+
+    .tagline {
+      color: var(--ink-dim);
+      font-size: 1rem;
+      margin: 0;
+    }
+
+    .console {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 1.25rem 1.25rem 1.5rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .route-row {
+      display: flex;
+      align-items: flex-end;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .field {
+      flex: 1 1 200px;
+      min-width: 0;
+    }
+
+    .field label {
+      display: block;
+      font-size: 0.8125rem;
+      color: var(--ink-dim);
+      margin-bottom: 0.4rem;
+    }
+
+    .combobox { position: relative; }
+
+    .combobox input {
+      width: 100%;
+      background: var(--surface-2);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      color: var(--ink);
+      font-size: 1rem;
+      padding: 0.65rem 0.75rem;
+      font-family: inherit;
+    }
+
+    .combobox input::placeholder { color: #565d6d; }
+
+    .combobox input:focus {
+      outline: none;
+      border-color: var(--amber);
+      box-shadow: 0 0 0 3px var(--amber-dim);
+    }
+
+    .connector {
+      flex: 0 0 auto;
+      display: flex;
+      align-items: center;
+      height: 2.7rem;
+      padding: 0 0.15rem;
+      color: var(--amber);
+    }
+
+    .connector svg { display: block; width: 28px; height: 10px; }
+
+    .combobox-menu {
+      position: absolute;
+      z-index: 2000;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 0;
+      max-height: 220px;
+      overflow-y: auto;
+      background: var(--surface-2);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 0.25rem;
+    }
+
+    .combo-option {
+      display: block;
+      width: 100%;
+      text-align: left;
+      background: none;
+      border: none;
+      color: var(--ink);
+      font-family: inherit;
+      font-size: 0.9375rem;
+      padding: 0.5rem 0.6rem;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    .combo-option:hover,
+    .combo-option.active {
+      background: var(--amber-dim);
+      color: var(--amber);
+    }
+
+    .engine-row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-top: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .engine-row .field-label {
+      font-size: 0.8125rem;
+      color: var(--ink-dim);
+    }
+
+    .go-btn {
+      flex: 0 0 auto;
+      margin-left: auto;
+      background: var(--amber);
+      color: #1a1204;
+      border: none;
+      font-family: "Barlow Condensed", sans-serif;
+      font-weight: 600;
+      font-size: 1.0625rem;
+      letter-spacing: 0.01em;
+      padding: 0.5rem 1.4rem;
+      border-radius: var(--radius);
+      cursor: pointer;
+      transition: filter 0.15s ease;
+    }
+
+    .go-btn:hover { filter: brightness(1.08); }
+    .go-btn:disabled { filter: grayscale(0.4) brightness(0.85); cursor: default; }
+    .go-btn:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+
+    .error-strip {
+      background: var(--danger-bg);
+      border-left: 3px solid var(--danger);
+      color: #ffb3b3;
+      padding: 0.75rem 1rem;
+      border-radius: 4px;
+      margin-bottom: 1.25rem;
+      font-size: 0.9375rem;
+    }
+
+    .stat-panel {
+      display: flex;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      margin-bottom: 0.5rem;
+      overflow: hidden;
+    }
+
+    .stat-disclaimer {
+      color: var(--ink-dim);
+      font-size: 0.75rem;
+      margin: 0 0.25rem 1.25rem;
+    }
+
+    .stat {
+      flex: 1;
+      padding: 1rem 1.25rem;
+      border-left: 1px solid var(--line);
+    }
+
+    .stat:first-child { border-left: none; }
+
+    .stat-label {
+      color: var(--ink-dim);
+      font-size: 0.8125rem;
+      margin-bottom: 0.3rem;
+    }
+
+    .stat-value {
+      font-family: "Barlow Condensed", sans-serif;
+      font-weight: 600;
+      font-size: clamp(1.5rem, 3.5vw, 2rem);
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.01em;
+    }
+
+    .stat-value-small {
+      color: var(--amber);
+    }
+
+    .map-frame {
+      position: relative;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 3px;
+    }
+
+    .map-frame::before,
+    .map-frame::after,
+    .map-frame > .tick-br,
+    .map-frame > .tick-bl {
+      content: "";
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      border: 2px solid var(--amber);
+      opacity: 0.7;
+    }
+
+    .map-frame::before { top: -1px; left: -1px; border-right: none; border-bottom: none; }
+    .map-frame::after { top: -1px; right: -1px; border-left: none; border-bottom: none; }
+    .map-frame .tick-bl { bottom: -1px; left: -1px; border-right: none; border-top: none; }
+    .map-frame .tick-br { bottom: -1px; right: -1px; border-left: none; border-top: none; }
+
+    #map {
+      height: 480px;
+      width: 100%;
+      border-radius: 4px;
+      background: #1b1e24;
+    }
+
+    .map-tiles-dark {
+      filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.9) saturate(0.85);
+    }
+
+    .leaflet-popup-content-wrapper {
+      background: var(--surface-2);
+      color: var(--ink);
+      border-radius: 6px;
+    }
+    .leaflet-popup-tip { background: var(--surface-2); }
+    .leaflet-popup-content strong { color: var(--amber); }
+    .leaflet-control-attribution {
+      background: rgba(26, 30, 38, 0.85) !important;
+      color: var(--ink-dim) !important;
+    }
+    .leaflet-control-attribution a { color: var(--ink-dim) !important; }
+    .leaflet-control-zoom a {
+      background: var(--surface-2) !important;
+      color: var(--ink) !important;
+      border-color: var(--line) !important;
+    }
+    .leaflet-control-zoom a:hover { background: var(--amber-dim) !important; }
+
+    .hidden { display: none !important; }
+
+    @media (max-width: 640px) {
+      .connector { display: none; }
+      .go-btn { margin-left: 0; width: 100%; }
+      .stat-panel { flex-direction: column; }
+      .stat { border-left: none; border-top: 1px solid var(--line); }
+      .stat:first-child { border-top: none; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .go-btn { transition: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="masthead">
+      <h1>Fuel Route Optimizer</h1>
+      <p class="tagline">Plan the cheapest way to get there.</p>
+    </header>
+
+    <div class="console">
+      <form id="route-form" class="route-row">
+        <div class="field">
+          <label for="start">Start</label>
+          <div class="combobox">
+            <input type="text" id="start" placeholder="e.g. Chicago, IL"
+                   autocomplete="off" role="combobox" aria-expanded="false" aria-autocomplete="list" required>
+            <div class="combobox-menu hidden" id="start-menu"></div>
+          </div>
+        </div>
+
+        <div class="connector" aria-hidden="true">
+          <svg viewBox="0 0 28 10" fill="none">
+            <line x1="0" y1="5" x2="20" y2="5" stroke="currentColor" stroke-width="2" stroke-dasharray="4 3"/>
+            <path d="M20 1L26 5L20 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+
+        <div class="field">
+          <label for="finish">Finish</label>
+          <div class="combobox">
+            <input type="text" id="finish" placeholder="e.g. Los Angeles, CA"
+                   autocomplete="off" role="combobox" aria-expanded="false" aria-autocomplete="list" required>
+            <div class="combobox-menu hidden" id="finish-menu"></div>
+          </div>
+        </div>
+      </form>
+
+      <div class="engine-row">
+        <span class="field-label">Routing engine is picked automatically based on distance</span>
+        <button type="submit" class="go-btn" id="submit-btn" form="route-form">Find route</button>
+      </div>
+    </div>
+
+    <div id="error-alert" class="error-strip hidden" role="alert"></div>
+
+    <div class="stat-panel hidden" id="summary-row">
+      <div class="stat">
+        <div class="stat-label">Distance</div>
+        <div class="stat-value" id="summary-distance">—</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Total gallons</div>
+        <div class="stat-value" id="summary-gallons">—</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Fuel cost</div>
+        <div class="stat-value" id="summary-cost">—</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Routing engine used</div>
+        <div class="stat-value stat-value-small" id="summary-engine">—</div>
+      </div>
+    </div>
+    <p class="stat-disclaimer hidden" id="summary-disclaimer">
+      Estimated — based on listed fuel prices and an assumed 10 mpg, not a guaranteed price.
+    </p>
+
+    <div class="map-frame">
+      <span class="tick-bl" aria-hidden="true"></span>
+      <span class="tick-br" aria-hidden="true"></span>
+      <div id="map"></div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="{% static 'js/app.js' %}"></script>
+</body>
+</html>
